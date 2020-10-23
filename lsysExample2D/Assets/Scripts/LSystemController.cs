@@ -7,64 +7,64 @@ using System.Text;
 
 public class LSystemController : MonoBehaviour {
 
+    Hashtable ruleHash = new Hashtable(100);
 	public float initial_length = 2;
 	public float initial_radius = 1.0f;
 	StringBuilder start = new StringBuilder("");
 	StringBuilder lang = new StringBuilder("");
-	StringBuilder[,] rules = new StringBuilder[2,2];
 	GameObject contents;
 	GameObject parent;
 	List<GameObject> list = new List<GameObject>();
 	float angleToUse = 45f;
-	public int iterations = 1;
+	public int iterations = 4;
 	
 	// for drawing lines
 	public Material lineMaterial; 
 	public float lineWidth = 1.0f;
 
 	void Start () {
-	
-		
-	    //variables : 0, 1
-    	//constants: [, ]
-    	//axiom  : 0
-    	//rules  : (1 → 11), (0 → 1[0]0)
-		// Second example LSystem from 
-		// http://en.wikipedia.org/wiki/L-system
-		start = new StringBuilder("0");
-		rules[0,0] = new StringBuilder("1");
-		rules[0,1] = new StringBuilder("11");
-		rules[1,0] = new StringBuilder("0");
-		rules[1,1] = new StringBuilder("1[0]0");
-		angleToUse = 45f;
-		run(iterations);
-		print (lang);
-		display2 ();
-		
-		// Weed type plant example from: 
-		// http://en.wikipedia.org/wiki/L-system
-//		start = new StringBuilder("X");
-//		rules[0,0] = new StringBuilder("X");
-//		rules[0,1] = new StringBuilder("F-[[X]+X]+F[+FX]-X");
-//		rules[1,0] = new StringBuilder("F");
-//		rules[1,1] = new StringBuilder("FF");
-//		angleToUse = 25f;
-//		run(iterations);
-//		print (lang);
-//		display3 ();
 
-	}
-	
-	// Get a rule from a given letter that's in our array
-	// Assume that there's a 2d array of [letters, rules]
-	string getRule( string input) {
-		for(int i=0; i<rules.GetLength(0); i++) {
-			//print (rules[i,0]);
-			if (rules[i,0].ToString().Equals( input )) {
-				return rules[i,1].ToString();
-			}
-		}
-		
+
+        //variables : 0, 1
+        //constants: [, ]
+        //axiom  : 0
+        //rules  : (1 → 11), (0 → 1[0]0)
+        // Second example LSystem from 
+        // http://en.wikipedia.org/wiki/L-system
+        start = new StringBuilder("0");
+        ruleHash.Add("1", "11");
+        ruleHash.Add("0", "1[0]0");
+        angleToUse = 45f;
+        run(iterations);
+        print(lang);
+        display2();
+
+        // Weed type plant example from: 
+        // http://en.wikipedia.org/wiki/L-system
+        //start = new StringBuilder("X");
+        //ruleHash.Add("X", "F-[[X]+X]+F[+FX]-X");
+        //ruleHash.Add("F", "FF");
+        //angleToUse = 25f;
+        //run(iterations);
+        //print(lang);
+        //display3();
+
+    }
+
+    // Get a rule from a given letter that's in our array
+    // Assume that there's a 2d array of [letters, rules]
+    string getRule( string input) {
+		//for(int i=0; i<rules.GetLength(0); i++) {
+		//	//print (rules[i,0]);
+		//	if (rules[i,0].ToString().Equals( input )) {
+		//		return rules[i,1].ToString();
+		//	}
+		//}
+		if (ruleHash.ContainsKey(input))
+        {
+            return (string)ruleHash[input];
+
+        }
 		return input;
 	}
 	
