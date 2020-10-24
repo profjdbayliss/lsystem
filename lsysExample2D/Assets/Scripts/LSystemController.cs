@@ -5,6 +5,9 @@ using System.IO;
 using System;
 using System.Text;
 using System.Diagnostics;
+using Unity.Collections;
+using Unity.Mathematics;
+using UnityEngine.Rendering;
 
 public class LSystemController : MonoBehaviour {
 
@@ -13,22 +16,28 @@ public class LSystemController : MonoBehaviour {
 
 	public float initial_length = 2;
 	public float initial_radius = 1.0f;
-    List<byte> start; //new StringBuilder("");
-                      //StringBuilder lang = new StringBuilder("");
+    List<byte> start; 
     List<byte> lang;
 	GameObject contents;
 	float angleToUse = 45f;
 	public int iterations = 4;
-    int drawnThings = 0;
 
 	// for drawing lines
 	public float lineWidth = 1.0f;
     Mesh lineMesh;
-    List<Color> colors;
-    List<Vector3> vertices;
+    struct vertexInfo
+    {
+        public Vector3 pos;     
+        public Color32 color;
+        public vertexInfo(Vector3 p, Color32 c)
+        {
+            pos = p;
+            color = c;
+        }
+    }
+    List<vertexInfo> vertices;
     List<int> indices;
     public Material lineMaterial;
-    MeshRenderer renderer;
     MeshFilter filter;
 
     void Start () {
@@ -39,9 +48,10 @@ public class LSystemController : MonoBehaviour {
         contents = GameObject.CreatePrimitive(PrimitiveType.Cube);
         contents.transform.position = new Vector3(0, 0f, 0);
         filter = (MeshFilter)contents.GetComponent("MeshFilter");
-        renderer = (MeshRenderer)filter.GetComponent<MeshRenderer>();
+        MeshRenderer renderer = (MeshRenderer)filter.GetComponent<MeshRenderer>();
         renderer.material = lineMaterial;
         lineMesh = new Mesh();
+        filter.mesh = lineMesh;
 
         watch.Start();
         //variables : 0, 1
@@ -64,8 +74,8 @@ public class LSystemController : MonoBehaviour {
         //UnityEngine.Debug.Log("Time for generation took: " + watch.ElapsedMilliseconds);
         //watch.Reset();
         //watch.Start();
-        //colors = new List<Color>(lang.Count);
-        //vertices = new List<Vector3>(lang.Count);
+        ////colors = new List<Color>(lang.Count);
+        //vertices = new List<vertexInfo>(lang.Count);
         //indices = new List<int>(lang.Count);
         //display2();
 
@@ -74,17 +84,17 @@ public class LSystemController : MonoBehaviour {
         // Weed type plant example from: 
         // http://en.wikipedia.org/wiki/L-system
         // rules: X = 0, F = 1, 
-        // [ = 6, ] = 9
-        // + = 2, - = 4
+        // [ = 4, ] = 5
+        // + = 2, - = 3
         //start = new StringBuilder("X");
         start.Add(0);
         //ruleHash.Add("X", "F-[[X]+X]+F[+FX]-X");
-        byte[] firstRule = new byte[] { 1, 4, 6, 6, 0, 9, 2, 0, 9, 2, 1, 6, 2, 1, 0, 9, 4, 0 };
+        byte[] firstRule = new byte[] { 1, 3, 4, 4, 0, 5, 2, 0, 5, 2, 1, 4, 2, 1, 0, 5, 3, 0 };
         ruleHash.Add((byte)0, firstRule);
         //ruleHash.Add("F", "FF");
         byte[] secondRule = new byte[] { 1, 1 };
-        ruleHash.Add((byte)1, secondRule);     
-        
+        ruleHash.Add((byte)1, secondRule);
+
         angleToUse = 25f;
         run(iterations);
         watch.Stop();
@@ -92,8 +102,7 @@ public class LSystemController : MonoBehaviour {
         UnityEngine.Debug.Log("Size of lang is: " + lang.Count);
         watch.Reset();
         watch.Start();
-        colors = new List<Color>(lang.Count);
-        vertices = new List<Vector3>(lang.Count);
+        vertices = new List<vertexInfo>(lang.Count);
         indices = new List<int>(lang.Count);
         display3();
 
@@ -149,8 +158,8 @@ public class LSystemController : MonoBehaviour {
     void display3() {
 
         // to push and pop location and angles
-        Stack<float> positions = new Stack<float>(10);
-        Stack<float> angles = new Stack<float>(10);
+        Stack<float> positions = new Stack<float>(100);
+        Stack<float> angles = new Stack<float>(100);
 
         // current location and angle
         float angle = 0f;
@@ -169,12 +178,14 @@ public class LSystemController : MonoBehaviour {
             byte buff = lang[i];
             switch (buff)
             {
+                case 0:
+                    break;
                 case 1:
                     // draw a line 
                     posy += initial_length;
-                    newPosition = new Vector3(position.x, posy, 0);
-                    rotated = rotate(position, new Vector3(position.x, posy, 0), angle);
-                    newPosition = new Vector3(rotated.x, rotated.y, 0);
+                    newPosition = new float3(position.x, posy, 0);
+                    rotated = rotate(position, new float3(position.x, posy, 0), angle);
+                    newPosition = new float3(rotated.x, rotated.y, 0);
                     addLineToMesh(lineMesh, position, newPosition, Color.green);
                     // set up for the next draw
                     position = newPosition;
@@ -185,18 +196,18 @@ public class LSystemController : MonoBehaviour {
                     // Turn right 25
                     angle += angleToUse;
                     break;
-                case 4:
+                case 3:
                     // Turn left 25
                     angle -= angleToUse;
                     break;
-                case 6:
+                case 4:
                     //[: push position and angle
                     positions.Push(posy);
                     positions.Push(posx);
                     float currentAngle = angle;
                     angles.Push(currentAngle);
                     break;
-                case 9:
+                case 5:
                     //]: pop position and angle
                     posx = positions.Pop();
                     posy = positions.Pop();
@@ -206,11 +217,34 @@ public class LSystemController : MonoBehaviour {
                 default: break;
             }
 
-            // after we recreate the mesh we need to assign it to the original object
-            filter.mesh = lineMesh;
 
         }
+        // after we recreate the mesh we need to assign it to the original object
+        MeshUpdateFlags flags = MeshUpdateFlags.DontNotifyMeshUsers & MeshUpdateFlags.DontRecalculateBounds &
+            MeshUpdateFlags.DontResetBoneBounds & MeshUpdateFlags.DontValidateIndices;
 
+        // set vertices
+        int totalCount = vertices.Count;
+        var layout = new[]
+        {
+                new VertexAttributeDescriptor(VertexAttribute.Position, VertexAttributeFormat.Float32, 3),
+                new VertexAttributeDescriptor(VertexAttribute.Color, VertexAttributeFormat.UNorm8, 4)
+            };
+        lineMesh.SetVertexBufferParams(totalCount, layout);
+        lineMesh.SetVertexBufferData(vertices, 0, 0, totalCount, 0, flags);
+
+        // set indices
+        UnityEngine.Rendering.IndexFormat format = IndexFormat.UInt32;
+        lineMesh.SetIndexBufferParams(totalCount, format);
+        lineMesh.SetIndexBufferData(indices, 0, 0, totalCount, flags);
+
+        // set submesh
+        SubMeshDescriptor desc = new SubMeshDescriptor(0, totalCount, MeshTopology.Lines);
+        desc.bounds = new Bounds();
+        desc.baseVertex = 0;
+        desc.firstVertex = 0;
+        desc.vertexCount = totalCount;
+        lineMesh.SetSubMesh(0, desc, flags);
     }
 
     // Display routine for 2d examples in the main program
@@ -223,13 +257,13 @@ public class LSystemController : MonoBehaviour {
 
         // current angle and position
         float angle = 0f;
-        Vector3 position = new Vector3(0, 0, 0);
+        float3 position = new float3(0, 0, 0);
         float posy = 0.0f;
         float posx = 0.0f;
 
         // positions to draw towards
-        Vector3 newPosition;
-        Vector2 rotated;
+        float3 newPosition;
+        float2 rotated;
 
         // start at 0,0,0        
 
@@ -242,10 +276,10 @@ public class LSystemController : MonoBehaviour {
                 case 0:
                     // draw a line ending in a leaf
                     posy += initial_length;
-                    newPosition = new Vector3(position.x, posy, 0);
-                    rotated = rotate(position, new Vector3(position.x, posy, 0), angle);
-                    newPosition = new Vector3(rotated.x, rotated.y, 0);
-                    addLineToMesh(lineMesh, position, new Vector3(rotated.x, rotated.y, 0), Color.green);
+                    newPosition = new float3(position.x, posy, 0);
+                    rotated = rotate(position, new float3(position.x, posy, 0), angle);
+                    newPosition = new float3(rotated.x, rotated.y, 0);
+                    addLineToMesh(lineMesh, position, new float3(rotated.x, rotated.y, 0), Color.green);
                     //drawLSystemLine(position, new Vector3(rotated.x, rotated.y, 0), line, Color.red);
                     // set up for the next draw
                     position = newPosition;
@@ -256,9 +290,9 @@ public class LSystemController : MonoBehaviour {
                 case 1:
                     // draw a line 
                     posy += initial_length;
-                    newPosition = new Vector3(position.x, posy, 0);
-                    rotated = rotate(position, new Vector3(position.x, posy, 0), angle);
-                    newPosition = new Vector3(rotated.x, rotated.y, 0);
+                    newPosition = new float3(position.x, posy, 0);
+                    rotated = rotate(position, new float3(position.x, posy, 0), angle);
+                    newPosition = new float3(rotated.x, rotated.y, 0);
                     //drawLSystemLine(position, newPosition, line, Color.green);
                     addLineToMesh(lineMesh, position, newPosition, Color.green);
                     // set up for the next draw
@@ -278,43 +312,59 @@ public class LSystemController : MonoBehaviour {
                     //]: pop position and angle, turn right 45 degrees
                     posx = positions.Pop();
                     posy = positions.Pop();
-                    position = new Vector3(posx, posy, 0);
+                    position = new float3(posx, posy, 0);
                     angle = angles.Pop();
                     angle += 45;
                     break;
                 default: break;
             }
             // after we recreate the mesh we need to assign it to the original object
-            filter.mesh = lineMesh;
+            MeshUpdateFlags flags = MeshUpdateFlags.DontNotifyMeshUsers & MeshUpdateFlags.DontRecalculateBounds &
+                MeshUpdateFlags.DontResetBoneBounds & MeshUpdateFlags.DontValidateIndices;
+
+            // set vertices
+            var layout = new[]
+            {
+                new VertexAttributeDescriptor(VertexAttribute.Position, VertexAttributeFormat.Float32, 3),
+                new VertexAttributeDescriptor(VertexAttribute.Color, VertexAttributeFormat.UNorm8, 4)
+            };
+            lineMesh.SetVertexBufferParams(vertices.Count, layout);
+            lineMesh.SetVertexBufferData(vertices, 0, 0, vertices.Count, 0, flags);
+
+            // set indices
+            UnityEngine.Rendering.IndexFormat format = IndexFormat.UInt32;
+            lineMesh.SetIndexBufferParams(indices.Count, format);
+            lineMesh.SetIndexBufferData(indices, 0, 0, indices.Count, flags);
+
+            // set submesh
+            SubMeshDescriptor desc = new SubMeshDescriptor(0, indices.Count, MeshTopology.Lines);
+            desc.bounds = new Bounds();
+            desc.baseVertex = 0;
+            desc.firstVertex = 0;
+            desc.vertexCount = vertices.Count;
+            lineMesh.SetSubMesh(0, desc, flags);
         }
     }
 
 
-    void addLineToMesh(Mesh mesh, Vector3 from, Vector3 to, Color color)
+    void addLineToMesh(Mesh mesh, float3 from, float3 to, Color color)
     {
-        Vector3[] lineVerts = new Vector3[] { from, to };
+        vertexInfo[] lineVerts = new vertexInfo[] { new vertexInfo(from, color), new vertexInfo(to, color) };
         int numberOfPoints = vertices.Count;
         int[] indicesForLines = new int[]{0+numberOfPoints, 1+numberOfPoints
-
         };
         vertices.AddRange(lineVerts);
         indices.AddRange(indicesForLines);
-        colors.Add(color);
-        colors.Add(color);
-
-        mesh.vertices = vertices.ToArray();
-        mesh.SetIndices(indices, MeshTopology.Lines, 0);
-        mesh.SetColors(colors);
     }
 
     // rotate a line and return the position after rotation
     // Assumes rotation around the Z axis
-    Vector2 rotate(Vector3 pivotPoint, Vector3 pointToRotate, float angle) {
-   		Vector2 result;
+    float2 rotate(float3 pivotPoint, float3 pointToRotate, float angle) {
+   		float2 result;
    		float Nx = (pointToRotate.x - pivotPoint.x);
    		float Ny = (pointToRotate.y - pivotPoint.y);
    		angle = -angle * Mathf.PI/180f;
-   		result = new Vector2(Mathf.Cos(angle) * Nx - Mathf.Sin(angle) * Ny + pivotPoint.x, Mathf.Sin(angle) * Nx + Mathf.Cos(angle) * Ny + pivotPoint.y);
+   		result = new float2(Mathf.Cos(angle) * Nx - Mathf.Sin(angle) * Ny + pivotPoint.x, Mathf.Sin(angle) * Nx + Mathf.Cos(angle) * Ny + pivotPoint.y);
    		return result;
 	}
    
@@ -334,15 +384,12 @@ public class LSystemController : MonoBehaviour {
             x = Mathf.Sin (Mathf.Deg2Rad * angle) * radiusX + center.x;
             y = Mathf.Cos (Mathf.Deg2Rad * angle) * radiusY + center.y;
 
-            vertices.Add(new Vector3(x, y, 0));
+            vertices.Add(new vertexInfo (new Vector3(x, y, 0), color ));
             indices.Add(numberOfPoints + i);
-            colors.Add(color);
             angle += (360f / segments);
 
         }
-        mesh.vertices = vertices.ToArray();
-        mesh.SetIndices(indices, MeshTopology.Lines, 0);
-        mesh.SetColors(colors);
+        
     }
 		
 	
@@ -350,5 +397,5 @@ public class LSystemController : MonoBehaviour {
 	void Update () {
 	
 	}
-	
+
 }
