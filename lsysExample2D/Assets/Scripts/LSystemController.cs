@@ -13,18 +13,20 @@ public class LSystemController : MonoBehaviour {
 
 	public float initial_length = 2;
 	public float initial_radius = 1.0f;
-	StringBuilder start = new StringBuilder("");
-	StringBuilder lang = new StringBuilder("");
+    List<byte> start; //new StringBuilder("");
+                      //StringBuilder lang = new StringBuilder("");
+    List<byte> lang;
 	GameObject contents;
 	float angleToUse = 45f;
 	public int iterations = 4;
-	
+    int drawnThings = 0;
+
 	// for drawing lines
 	public float lineWidth = 1.0f;
-    List<Color> colors = new List<Color>(100);
     Mesh lineMesh;
-    List<Vector3> vertices = new List<Vector3>(100);
-    List<int> indices = new List<int>(100);
+    List<Color> colors;
+    List<Vector3> vertices;
+    List<int> indices;
     public Material lineMaterial;
     MeshRenderer renderer;
     MeshFilter filter;
@@ -48,32 +50,51 @@ public class LSystemController : MonoBehaviour {
         //rules  : (1 → 11), (0 → 1[0]0)
         // Second example LSystem from 
         // http://en.wikipedia.org/wiki/L-system
-        //start = new StringBuilder("0");
-        //ruleHash.Add("1", "11");
-        //ruleHash.Add("0", "1[0]0");
+        start = new List<byte>(100);
+        //start.Add(0);
+        //lang = start;
+        ////new StringBuilder("0");
+        //byte[] firstRule = new byte[] { 1, 1 };
+        //ruleHash.Add((byte)1, firstRule);
+        //byte[] secondRule = new byte[] { 1, 6, 0, 9, 0 };
+        //ruleHash.Add((byte)0, secondRule);
         //angleToUse = 45f;
         //run(iterations);
         //watch.Stop();
         //UnityEngine.Debug.Log("Time for generation took: " + watch.ElapsedMilliseconds);
-        //print(lang);
         //watch.Reset();
         //watch.Start();
+        //colors = new List<Color>(lang.Count);
+        //vertices = new List<Vector3>(lang.Count);
+        //indices = new List<int>(lang.Count);
         //display2();
 
 
 
         // Weed type plant example from: 
         // http://en.wikipedia.org/wiki/L-system
-        start = new StringBuilder("X");
-        ruleHash.Add("X", "F-[[X]+X]+F[+FX]-X");
-        ruleHash.Add("F", "FF");
+        // rules: X = 0, F = 1, 
+        // [ = 6, ] = 9
+        // + = 2, - = 4
+        //start = new StringBuilder("X");
+        start.Add(0);
+        //ruleHash.Add("X", "F-[[X]+X]+F[+FX]-X");
+        byte[] firstRule = new byte[] { 1, 4, 6, 6, 0, 9, 2, 0, 9, 2, 1, 6, 2, 1, 0, 9, 4, 0 };
+        ruleHash.Add((byte)0, firstRule);
+        //ruleHash.Add("F", "FF");
+        byte[] secondRule = new byte[] { 1, 1 };
+        ruleHash.Add((byte)1, secondRule);     
+        
         angleToUse = 25f;
         run(iterations);
         watch.Stop();
         UnityEngine.Debug.Log("Time for generation took: " + watch.ElapsedMilliseconds);
-        print(lang);
+        UnityEngine.Debug.Log("Size of lang is: " + lang.Count);
         watch.Reset();
         watch.Start();
+        colors = new List<Color>(lang.Count);
+        vertices = new List<Vector3>(lang.Count);
+        indices = new List<int>(lang.Count);
         display3();
 
 
@@ -84,10 +105,10 @@ public class LSystemController : MonoBehaviour {
     }
 
     // Get a rule from a given letter that's in our array
-    string getRule( string input) {		
-		if (ruleHash.ContainsKey(input))
+    byte[] getRule( byte[] input) {		
+		if (ruleHash.ContainsKey(input[0]))
         {
-            return (string)ruleHash[input];
+            return (byte[])ruleHash[input[0]];
 
         }
 		return input;
@@ -95,84 +116,101 @@ public class LSystemController : MonoBehaviour {
 	
 	// Run the lsystem iterations number of times on the start axiom.
 	void run(int iterations) {
-    	StringBuilder curr = start;
-		
-    	for (int i = 0; i < iterations; i++) {
-        	for (int j = 0; j < curr.Length; j++) {
-            	string buff = getRule(curr[j].ToString() );
-                curr = curr.Replace(curr[j].ToString(), buff, j, 1);
-                j += buff.Length - 1;
-        	}
-    	}
+    	List<byte> buffer1 = start;
+        List<byte> buffer2 = new List<byte>(100);
+        List<byte> currentList = buffer1;
+        List<byte> newList = buffer2;
+        byte[] singleByte = new byte[] { 0 };
+        int currentCount = 0;
 
-    	lang = curr;
-	}
+        for (int i = 0; i < iterations; i++) {
+            currentCount = currentList.Count;
+        	for (int j = 0; j < currentCount; j++) {
+                singleByte[0] = currentList[j];
+                byte[] buff = getRule(singleByte );
+                newList.AddRange(buff);
+        	}
+            List<byte> tmp = currentList;
+            currentList = newList;
+            tmp.Clear();
+            newList = tmp;
+    	}
+        
+        lang = currentList;
+        //for (int i = 0; i < start.Count; i++)
+        //{
+        //    UnityEngine.Debug.Log(lang[i]);
+        //}
+
+    }
 
 
     // The display routine for the weed type plant above
     void display3() {
-		
-		// to push and pop location and angles
-		Stack<float> positions = new Stack<float>(10);
-		Stack<float> angles = new Stack<float>(10);
 
-		// current location and angle
-		float angle = 0f;
-		Vector3 position = new Vector3(0,0,0);
-		float posy = 0.0f;
-		float posx = 0.0f;
+        // to push and pop location and angles
+        Stack<float> positions = new Stack<float>(10);
+        Stack<float> angles = new Stack<float>(10);
+
+        // current location and angle
+        float angle = 0f;
+        Vector3 position = new Vector3(0, 0, 0);
+        float posy = 0.0f;
+        float posx = 0.0f;
 
         // location and rotation to draw towards
-		Vector3 newPosition;
-		Vector2 rotated;
-        
+        Vector3 newPosition;
+        Vector2 rotated;
+
         // start at 0,0,0
         // Apply all the drawing rules to the lsystem string
-        for (int i=0; i<lang.Length; i++) {
-			string buff = lang[i].ToString();
-			switch (buff) {
-			case "-" : 
-				// Turn left 25
-				angle -= angleToUse;
-				break;
-			case "+" : 
-				// Turn right 25
-				angle += angleToUse;
-				break;
-			case "F" : 
-				// draw a line 
-				posy += initial_length;
-				newPosition = new Vector3(position.x, posy, 0);
-				rotated = rotate (position, new Vector3(position.x,posy,0), angle);
-				newPosition = new Vector3(rotated.x,rotated.y,0);
-                addLineToMesh(lineMesh, position, newPosition, Color.green);
-                // set up for the next draw
-                position = newPosition;
-				posx = newPosition.x;
-				posy = newPosition.y;    
-                break;
-			case "[" :
-				//[: push position and angle
-				positions.Push (posy);
-				positions.Push (posx);
-				float currentAngle = angle;
-				angles.Push(currentAngle);
-				break;
-			case "]" : 
-				//]: pop position and angle
-				posx = positions.Pop();
-				posy = positions.Pop();
-				position = new Vector3(posx, posy, 0);
-				angle = angles.Pop();
-                break;
-			default : break;
-			}
+        for (int i = 0; i < lang.Count; i++)
+        {
+            byte buff = lang[i];
+            switch (buff)
+            {
+                case 1:
+                    // draw a line 
+                    posy += initial_length;
+                    newPosition = new Vector3(position.x, posy, 0);
+                    rotated = rotate(position, new Vector3(position.x, posy, 0), angle);
+                    newPosition = new Vector3(rotated.x, rotated.y, 0);
+                    addLineToMesh(lineMesh, position, newPosition, Color.green);
+                    // set up for the next draw
+                    position = newPosition;
+                    posx = newPosition.x;
+                    posy = newPosition.y;
+                    break;
+                case 2:
+                    // Turn right 25
+                    angle += angleToUse;
+                    break;
+                case 4:
+                    // Turn left 25
+                    angle -= angleToUse;
+                    break;
+                case 6:
+                    //[: push position and angle
+                    positions.Push(posy);
+                    positions.Push(posx);
+                    float currentAngle = angle;
+                    angles.Push(currentAngle);
+                    break;
+                case 9:
+                    //]: pop position and angle
+                    posx = positions.Pop();
+                    posy = positions.Pop();
+                    position = new Vector3(posx, posy, 0);
+                    angle = angles.Pop();
+                    break;
+                default: break;
+            }
 
             // after we recreate the mesh we need to assign it to the original object
             filter.mesh = lineMesh;
-            
+
         }
-        
+
     }
 
     // Display routine for 2d examples in the main program
@@ -196,12 +234,12 @@ public class LSystemController : MonoBehaviour {
         // start at 0,0,0        
 
         // Apply the drawing rules to the string given to us
-        for (int i = 0; i < lang.Length; i++)
+        for (int i = 0; i < lang.Count; i++)
         {
-            string buff = lang[i].ToString();
+            byte buff = lang[i];
             switch (buff)
             {
-                case "0":
+                case 0:
                     // draw a line ending in a leaf
                     posy += initial_length;
                     newPosition = new Vector3(position.x, posy, 0);
@@ -212,10 +250,10 @@ public class LSystemController : MonoBehaviour {
                     // set up for the next draw
                     position = newPosition;
                     posx = newPosition.x;
-                    posy = newPosition.y;         
+                    posy = newPosition.y;
                     addCircleToMesh(lineMesh, 0.45f, 0.45f, position, Color.magenta);
                     break;
-                case "1":
+                case 1:
                     // draw a line 
                     posy += initial_length;
                     newPosition = new Vector3(position.x, posy, 0);
@@ -228,7 +266,7 @@ public class LSystemController : MonoBehaviour {
                     posx = newPosition.x;
                     posy = newPosition.y;
                     break;
-                case "[":
+                case 6:
                     //[: push position and angle, turn left 45 degrees
                     positions.Push(posy);
                     positions.Push(posx);
@@ -236,7 +274,7 @@ public class LSystemController : MonoBehaviour {
                     angles.Push(currentAngle);
                     angle -= 45;
                     break;
-                case "]":
+                case 9:
                     //]: pop position and angle, turn right 45 degrees
                     posx = positions.Pop();
                     posy = positions.Pop();
