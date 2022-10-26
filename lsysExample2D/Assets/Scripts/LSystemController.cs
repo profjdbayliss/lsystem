@@ -1,17 +1,14 @@
 using UnityEngine;
 using System.Collections;
 using System.Collections.Generic;
-using System.IO;
-using System;
-using System.Text;
 using System.Diagnostics;
-using Unity.Collections;
-using Unity.Mathematics;
 using UnityEngine.Rendering;
+using Unity.Mathematics;
 
 public class LSystemController : MonoBehaviour {
 
     
+    // for defining the language and rules
     Hashtable ruleHash = new Hashtable(100);
 
 	public float initial_length = 2;
@@ -42,6 +39,8 @@ public class LSystemController : MonoBehaviour {
 
     void Start () {
 
+        // for timing start/finish of the rule generation and display
+        // can be commented out
         Stopwatch watch = new Stopwatch();
 
         // create the object to draw with some default values for the mesh and rendering
@@ -54,30 +53,37 @@ public class LSystemController : MonoBehaviour {
         filter.mesh = lineMesh;
 
         watch.Start();
+        // we set the start with the expected max size of the language iteration
+        start = new List<byte>(100);
+        
         //variables : 0, 1
         //constants: [, ]
         //axiom  : 0
         //rules  : (1 → 11), (0 → 1[0]0)
         // Second example LSystem from 
         // http://en.wikipedia.org/wiki/L-system
-        start = new List<byte>(100);
-        //start.Add(0);
-        //lang = start;
-        ////new StringBuilder("0");
-        //byte[] firstRule = new byte[] { 1, 1 };
-        //ruleHash.Add((byte)1, firstRule);
-        //byte[] secondRule = new byte[] { 1, 6, 0, 9, 0 };
-        //ruleHash.Add((byte)0, secondRule);
-        //angleToUse = 45f;
-        //run(iterations);
-        //watch.Stop();
-        //UnityEngine.Debug.Log("Time for generation took: " + watch.ElapsedMilliseconds);
-        //watch.Reset();
-        //watch.Start();
-        ////colors = new List<Color>(lang.Count);
-        //vertices = new List<vertexInfo>(lang.Count);
-        //indices = new List<int>(lang.Count);
-        //display2();
+        // uncomment the following for the lsystem above:
+        // start.Add(0);
+        // lang = start;
+        // // 1 -> 11
+        // byte[] firstRule = new byte[] { 1, 1 };
+        // ruleHash.Add((byte)1, firstRule);
+        // // 0 -> 1[0]0
+        // // note: we/re using bytes rather than alpha text here, so we just need [ and ] to be
+        // // an easy to remember number 6 and 9 look like opposites to me and I chose them.
+        // byte[] secondRule = new byte[] { 1, 6, 0, 9, 0 };
+        // ruleHash.Add((byte)0, secondRule);
+        // angleToUse = 45f;
+        // run(iterations);
+        // // now print out the time for gen
+        // watch.Stop();
+        // UnityEngine.Debug.Log("Time for generation took: " + watch.ElapsedMilliseconds);
+        // watch.Reset();
+        // watch.Start();
+        // // print out the display time
+        // vertices = new List<vertexInfo>(lang.Count);
+        // indices = new List<int>(lang.Count);
+        // display2();
 
 
 
@@ -86,21 +92,25 @@ public class LSystemController : MonoBehaviour {
         // rules: X = 0, F = 1, 
         // [ = 4, ] = 5
         // + = 2, - = 3
-        //start = new StringBuilder("X");
+        // Uncomment the following for a weed type lsystem:
+        
         start.Add(0);
-        //ruleHash.Add("X", "F-[[X]+X]+F[+FX]-X");
+        //X -> F-[[X]+X]+F[+FX]-X
+        // keep in mind that all the letters are translated into numbers for the byte array
         byte[] firstRule = new byte[] { 1, 3, 4, 4, 0, 5, 2, 0, 5, 2, 1, 4, 2, 1, 0, 5, 3, 0 };
         ruleHash.Add((byte)0, firstRule);
-        //ruleHash.Add("F", "FF");
+        //F -> FF 
         byte[] secondRule = new byte[] { 1, 1 };
         ruleHash.Add((byte)1, secondRule);
-
+        
         angleToUse = 25f;
         run(iterations);
+        // now print out the time for gen
         watch.Stop();
         UnityEngine.Debug.Log("Time for generation took: " + watch.ElapsedMilliseconds);
         UnityEngine.Debug.Log("Size of lang is: " + lang.Count);
         watch.Reset();
+        // print out the time for display
         watch.Start();
         vertices = new List<vertexInfo>(lang.Count);
         indices = new List<int>(lang.Count);
@@ -124,6 +134,7 @@ public class LSystemController : MonoBehaviour {
 	}
 	
 	// Run the lsystem iterations number of times on the start axiom.
+    // note that this is double buffering
 	void run(int iterations) {
     	List<byte> buffer1 = start;
         List<byte> buffer2 = new List<byte>(100);
@@ -146,11 +157,6 @@ public class LSystemController : MonoBehaviour {
     	}
         
         lang = currentList;
-        //for (int i = 0; i < start.Count; i++)
-        //{
-        //    UnityEngine.Debug.Log(lang[i]);
-        //}
-
     }
 
 
@@ -391,11 +397,5 @@ public class LSystemController : MonoBehaviour {
         }
         
     }
-		
-	
-	// Update is called once per frame
-	void Update () {
-	
-	}
 
 }
